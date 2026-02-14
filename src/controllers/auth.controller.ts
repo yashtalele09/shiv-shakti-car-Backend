@@ -4,6 +4,7 @@ import bcrypt from "bcrypt";
 import { authConfig, adminAuthConfig } from "../config/auth";
 import jwt from "jsonwebtoken";
 import admin from "../config/firebaseAdmin";
+import { v4 as uuidv4 } from "uuid";
 
 const authController = async (req: Request, res: Response) => {
   try {
@@ -25,6 +26,7 @@ const authController = async (req: Request, res: Response) => {
     const hashedPassword = await bcrypt.hash(password, 10);
 
     const user = await authService.createUser({
+      id: uuidv4(),
       name,
       email,
       phone,

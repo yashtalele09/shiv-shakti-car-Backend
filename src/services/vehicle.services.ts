@@ -18,9 +18,9 @@ const getVehicleById = async (id: string) => {
     }
 };
 
-const getAllVehicle = async () => {
+const getAllVehicle = async (query: {}, sortOptions: {}, skip: number, limit: number) => {
     try {
-        const vehicleData = await vehicle.find();
+        const vehicleData = await vehicle.find(query).sort(sortOptions).skip(skip).limit(limit);
         return vehicleData;
     } catch (error) {
         throw error;
