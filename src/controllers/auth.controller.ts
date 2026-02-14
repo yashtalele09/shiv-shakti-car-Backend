@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import authService from "../services/auth.services";
 import bcrypt from "bcrypt";
-import { authConfig } from "../config/auth";
+import { authConfig, adminAuthConfig } from "../config/auth";
 import jwt from "jsonwebtoken";
 import admin from "../config/firebaseAdmin";
 
@@ -38,7 +38,6 @@ const authController = async (req: Request, res: Response) => {
       .status(201)
       .json({ success: true, message: "User created successfully", token });
   } catch (error) {
-    console.error("Error in authController:", error);
     res.status(500).json({ success: false, message: "Internal server error" });
   }
 };
@@ -52,7 +51,6 @@ const firebaseAuthController = async (req: Request, res: Response) => {
       return res.status(400).json({ message: "Token missing" });
     }
 
-    // 🔍 Verify Firebase ID token
     const decodedToken = await admin.auth().verifyIdToken(token);
 
     const { email, name, picture, uid } = decodedToken;
@@ -60,7 +58,7 @@ const firebaseAuthController = async (req: Request, res: Response) => {
     if (!email || !name || !uid) {
       return res.status(400).json({ message: "Invalid Firebase token" });
     }
-    // 🔎 Check if user exists
+  
     let user = await authService.getOneUserByEmail(email);
 
     if (!user) {
@@ -112,7 +110,6 @@ const loginController = async (req: Request, res: Response) => {
       });
     }
 
-    // 🔥 VERY IMPORTANT CHECK
     if (user.provider !== "local") {
       return res.status(400).json({
         success: false,
@@ -120,7 +117,6 @@ const loginController = async (req: Request, res: Response) => {
       });
     }
 
-    // 🔥 Check if password exists
     if (!user.password) {
       return res.status(400).json({
         success: false,
@@ -162,10 +158,72 @@ const loginController = async (req: Request, res: Response) => {
 };
 
 
+const adminLoginController = async (req: Request, res: Response) => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: "All fields are required",
+      });
+    }
+
+    const user = await authService.getOneAdminByEmail(email);
+
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    if (!user.password) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid login method",
+      });
+    }
+
+    const isPasswordValid = await bcrypt.compare(
+      password,
+      user.password
+    );
+
+    if (!isPasswordValid) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid password",
+      });
+    }
+
+    const token = jwt.sign(
+      { email: user.email },
+      adminAuthConfig.jwtSecret,
+      { expiresIn: adminAuthConfig.jwtExpiresIn }
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "User logged in successfully",
+      token,
+    });
+
+  } catch (error) {
+    console.error("Error in loginController:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+    });
+  }
+};
+
+
 const authenticateController = {
   authController,
   loginController,
-  firebaseAuthController
+  firebaseAuthController,
+  adminLoginController
 };
 
 export default authenticateController;

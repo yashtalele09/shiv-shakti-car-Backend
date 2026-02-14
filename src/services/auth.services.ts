@@ -1,4 +1,5 @@
 import User from "../models/user";
+import Admin from "../models/admin";
 
 const createUser = async (data: {}) => {
   try {
@@ -18,11 +19,21 @@ const getOneUserByEmail = async (email: string) => {
   }
 };
 
+const getOneAdminByEmail = async (email: string) => {
+  try {
+    const admin = await Admin.findOne({ email }).select("+password");
+    return admin;
+  } catch (error) {
+    throw error;
+  }
+};
+
 
 
 const authService = {
   createUser,
   getOneUserByEmail,
+  getOneAdminByEmail,
 };
 
 export default authService;
