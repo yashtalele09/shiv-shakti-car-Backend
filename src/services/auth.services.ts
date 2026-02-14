@@ -11,12 +11,14 @@ const createUser = async (data: {}) => {
 
 const getOneUserByEmail = async (email: string) => {
   try {
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ email }).select("+password");
     return user;
   } catch (error) {
     throw error;
   }
 };
+
+
 
 const authService = {
   createUser,

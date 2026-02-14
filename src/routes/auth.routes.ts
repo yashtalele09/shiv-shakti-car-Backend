@@ -1,9 +1,9 @@
 import { Router } from "express";
-import { authController } from "../controllers/auth.controller";
-import { authenticate } from "middleware/auth";
+import authenticateController from "../controllers/auth.controller";
 
 const router = Router();
 
-router.post("/register", authController);
-
+router.post("/register", authenticateController.authController);
+router.post("/login", authenticateController.loginController);
+router.post("/firebase", authenticateController.firebaseAuthController);
 export default router;
