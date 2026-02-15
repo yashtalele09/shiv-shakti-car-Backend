@@ -6,10 +6,11 @@
   "author": "Yash Talele",
   "main": "src/index.ts",
   "scripts": {
-    "dev": "nodemon --exec ts-node ./src/index.ts",
-    "format": "prettier --write .",
-    "format:check": "prettier --check .",
-    "build": "tsc"
+  "dev": "nodemon --exec ts-node src/index.ts",
+  "build": "tsc",
+  "start": "node dist/index.js",
+  "format": "prettier --write .",
+  "format:check": "prettier --check ."
   },
   "devDependencies": {
     "@types/bcrypt": "^6.0.0",
