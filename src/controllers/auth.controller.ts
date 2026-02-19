@@ -36,14 +36,21 @@ const authController = async (req: Request, res: Response) => {
     const token = jwt.sign({ id: user._id }, authConfig.jwtSecret, {
       expiresIn: authConfig.jwtExpiresIn,
     });
-    res
-      .status(201)
-      .json({ success: true, message: "User created successfully", token });
+    res.status(201).json({
+      success: true,
+      message: "User created successfully",
+      token,
+      user: {
+        id: user._id,
+        name,
+        email,
+        phone,
+      },
+    });
   } catch (error) {
     res.status(500).json({ success: false, message: "Internal server error" });
   }
 };
-
 
 const firebaseAuthController = async (req: Request, res: Response) => {
   try {
@@ -60,7 +67,7 @@ const firebaseAuthController = async (req: Request, res: Response) => {
     if (!email || !name || !uid) {
       return res.status(400).json({ message: "Invalid Firebase token" });
     }
-  
+
     let user = await authService.getOneUserByEmail(email);
 
     if (!user) {
@@ -83,14 +90,12 @@ const firebaseAuthController = async (req: Request, res: Response) => {
       token: appToken,
       user,
     });
-
   } catch (error) {
     return res.status(401).json({
       message: "Invalid Firebase token",
     });
   }
 };
-
 
 const loginController = async (req: Request, res: Response) => {
   try {
@@ -112,6 +117,8 @@ const loginController = async (req: Request, res: Response) => {
       });
     }
 
+    const { password: _, ...userWithoutPassword } = user.toObject();
+
     if (user.provider !== "local") {
       return res.status(400).json({
         success: false,
@@ -126,10 +133,7 @@ const loginController = async (req: Request, res: Response) => {
       });
     }
 
-    const isPasswordValid = await bcrypt.compare(
-      password,
-      user.password
-    );
+    const isPasswordValid = await bcrypt.compare(password, user.password);
 
     if (!isPasswordValid) {
       return res.status(400).json({
@@ -138,18 +142,16 @@ const loginController = async (req: Request, res: Response) => {
       });
     }
 
-    const token = jwt.sign(
-      { id: user._id },
-      authConfig.jwtSecret,
-      { expiresIn: authConfig.jwtExpiresIn }
-    );
+    const token = jwt.sign({ id: user._id }, authConfig.jwtSecret, {
+      expiresIn: authConfig.jwtExpiresIn,
+    });
 
     return res.status(200).json({
       success: true,
       message: "User logged in successfully",
+      user: userWithoutPassword,
       token,
     });
-
   } catch (error) {
     console.error("Error in loginController:", error);
     return res.status(500).json({
@@ -158,7 +160,6 @@ const loginController = async (req: Request, res: Response) => {
     });
   }
 };
-
 
 const adminLoginController = async (req: Request, res: Response) => {
   try {
@@ -187,10 +188,7 @@ const adminLoginController = async (req: Request, res: Response) => {
       });
     }
 
-    const isPasswordValid = await bcrypt.compare(
-      password,
-      user.password
-    );
+    const isPasswordValid = await bcrypt.compare(password, user.password);
 
     if (!isPasswordValid) {
       return res.status(400).json({
@@ -199,18 +197,15 @@ const adminLoginController = async (req: Request, res: Response) => {
       });
     }
 
-    const token = jwt.sign(
-      { email: user.email },
-      adminAuthConfig.jwtSecret,
-      { expiresIn: adminAuthConfig.jwtExpiresIn }
-    );
+    const token = jwt.sign({ email: user.email }, adminAuthConfig.jwtSecret, {
+      expiresIn: adminAuthConfig.jwtExpiresIn,
+    });
 
     return res.status(200).json({
       success: true,
       message: "User logged in successfully",
       token,
     });
-
   } catch (error) {
     console.error("Error in loginController:", error);
     return res.status(500).json({
@@ -220,12 +215,11 @@ const adminLoginController = async (req: Request, res: Response) => {
   }
 };
 
-
 const authenticateController = {
   authController,
   loginController,
   firebaseAuthController,
-  adminLoginController
+  adminLoginController,
 };
 
 export default authenticateController;
