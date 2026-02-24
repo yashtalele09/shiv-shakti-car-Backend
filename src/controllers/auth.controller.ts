@@ -54,15 +54,17 @@ const authController = async (req: Request, res: Response) => {
 
 const firebaseAuthController = async (req: Request, res: Response) => {
   try {
-    const { token } = req.body;
+    const { idToken } = req.body;
 
-    if (!token) {
+    if (!idToken) {
       return res.status(400).json({ message: "Token missing" });
     }
 
-    const decodedToken = await admin.auth().verifyIdToken(token);
+    const decodedToken = await admin.auth().verifyIdToken(idToken);
 
     const { email, name, picture, uid } = decodedToken;
+
+    console.log("decodedToken", decodedToken);
 
     if (!email || !name || !uid) {
       return res.status(400).json({ message: "Invalid Firebase token" });
@@ -82,7 +84,7 @@ const firebaseAuthController = async (req: Request, res: Response) => {
 
     const appToken = jwt.sign(
       { id: user._id, email: user.email },
-      process.env.JWT_SECRET as string,
+      process.env.JWT_SECRET_KEY as string,
       { expiresIn: "7d" }
     );
 
@@ -91,6 +93,7 @@ const firebaseAuthController = async (req: Request, res: Response) => {
       user,
     });
   } catch (error) {
+    console.log("FULL FIREBASE ERROR:", error);
     return res.status(401).json({
       message: "Invalid Firebase token",
     });
