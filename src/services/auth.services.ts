@@ -19,6 +19,15 @@ const getOneUserByEmail = async (email: string) => {
   }
 };
 
+const getOneUserById = async (id: string) => {
+  try {
+    const user = await User.findById(id).select("+password");
+    return user;
+  } catch (error) {
+    throw error;
+  }
+};
+
 const getOneAdminByEmail = async (email: string) => {
   try {
     const admin = await Admin.findOne({ email }).select("+password");
@@ -28,12 +37,23 @@ const getOneAdminByEmail = async (email: string) => {
   }
 };
 
-
+const updateUser = async (id: string, data: {}) => {
+  try {
+    const user = await User.findOneAndUpdate({ id }, data, {
+      new: true,
+    }).select("+password");
+    return user;
+  } catch (error) {
+    throw error;
+  }
+};
 
 const authService = {
   createUser,
   getOneUserByEmail,
   getOneAdminByEmail,
+  getOneUserById,
+  updateUser,
 };
 
 export default authService;
