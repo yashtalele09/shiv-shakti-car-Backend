@@ -18,7 +18,7 @@ router.get(
 );
 router.post(
   "/update-vehicle-by-id",
-  authenticateAdmin,
+  // authenticateAdmin,
   vehicleController.updateVehicleById
 );
 router.post(

@@ -5,11 +5,13 @@ export type InquiryStatus = "Pending" | "Received" | "Contacted" | "Resolved";
 
 export interface IInquiry extends Document {
   inquiryId: string;
+  userId: string;
   name: string;
   email: string;
   phone: string;
   message: string;
   status: InquiryStatus;
+  verify: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -21,6 +23,12 @@ const inquirySchema = new mongoose.Schema<IInquiry>(
       required: true,
       default: () => uuidv4(),
       unique: true,
+    },
+
+    userId: {
+      type: String,
+      ref: "User",
+      trim: true,
     },
 
     name: {
@@ -46,6 +54,9 @@ const inquirySchema = new mongoose.Schema<IInquiry>(
       type: String,
       required: true,
       trim: true,
+    },
+    verify: {
+      type: Boolean,
     },
     status: {
       type: String,

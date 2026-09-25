@@ -5,8 +5,9 @@ const router = Router();
 
 // Public
 router.post("/create-inquiry", inquiryController.createInquiry);
+router.post("/send-otp", inquiryController.sendInquiryOtp);
+router.post("/verify-otp", inquiryController.verifyInquiryOtpController);
 router.get("/check-status", inquiryController.checkInquiryStatus);
-
 // Admin
 router.get("/get-inquiry", inquiryController.getInquiries);
 router.get("/get-inquiry-by-id", inquiryController.getInquiryById);

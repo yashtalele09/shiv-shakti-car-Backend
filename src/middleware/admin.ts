@@ -20,14 +20,12 @@ export const authenticateAdmin: RequestHandler = async (
     if (!authHeader?.startsWith("Bearer ")) {
       return res.status(401).json({ message: "No token provided" });
     }
-    
+
     const token = authHeader.split(" ")[1];
 
     const decoded = jwt.verify(token, adminAuthConfig.jwtSecret) as {
       email: string;
-      };
-      
-      console.log(decoded.email)
+    };
 
     // 🔥 Replace Prisma with Mongoose
     const admin = await Admin.findOne({ email: decoded.email }).select("email");
