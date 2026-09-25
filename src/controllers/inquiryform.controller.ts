@@ -6,10 +6,73 @@ import {
   updateInquiryStatus as updateInquiryStatusService,
   getInquiryStatusForUser as getInquiryStatusForUserService,
 } from "../services/inquiry.services";
+import {
+  clearInquiryVerification,
+  isEmailVerifiedForInquiry,
+  requestInquiryOtp,
+  verifyInquiryOtp,
+} from "../services/otp.services";
+
+const sendInquiryOtp = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      res.status(400).json({ success: false, message: "Email is required" });
+      return;
+    }
+
+    await requestInquiryOtp(email);
+
+    res.status(200).json({
+      success: true,
+      message: "OTP sent to your email",
+    });
+  } catch (error: any) {
+    console.error("Error sending inquiry OTP:", error);
+    const isCooldown =
+      error.message === "Please wait before requesting another OTP";
+    res.status(isCooldown ? 429 : 500).json({
+      success: false,
+      message: error.message || "Failed to send OTP",
+    });
+  }
+};
+const verifyInquiryOtpController = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const { email, otp } = req.body;
+
+    if (!email || !otp) {
+      res
+        .status(400)
+        .json({ success: false, message: "Email and OTP are required" });
+      return;
+    }
+
+    const isValid = await verifyInquiryOtp(email, otp);
+
+    if (!isValid) {
+      res
+        .status(400)
+        .json({ success: false, message: "Invalid or expired OTP" });
+      return;
+    }
+
+    res
+      .status(200)
+      .json({ success: true, message: "Email verified successfully" });
+  } catch (error) {
+    console.error("Error verifying inquiry OTP:", error);
+    res.status(500).json({ success: false, message: "Failed to verify OTP" });
+  }
+};
 
 const createInquiry = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { name, email, phone, message } = req.body;
+    const { userId, name, email, phone, message } = req.body;
 
     if (!name || !email || !phone || !message) {
       res.status(400).json({
@@ -19,7 +82,26 @@ const createInquiry = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    const inquiry = await createInquiryService({ name, email, phone, message });
+    const isVerified = await isEmailVerifiedForInquiry(email);
+
+    if (!isVerified) {
+      res.status(403).json({
+        success: false,
+        message: "Please verify your email before submitting an inquiry",
+      });
+      return;
+    }
+
+    const inquiry = await createInquiryService({
+      userId,
+      name,
+      email,
+      phone,
+      message,
+      verify: true,
+    });
+
+    await clearInquiryVerification(email);
 
     res.status(201).json({
       success: true,
@@ -188,6 +270,8 @@ const inquiryController = {
   getInquiryById,
   updateInquiryStatus,
   checkInquiryStatus,
+  sendInquiryOtp,
+  verifyInquiryOtpController,
 };
 
 export default inquiryController;

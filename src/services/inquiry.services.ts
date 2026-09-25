@@ -1,10 +1,12 @@
 import Inquiry, { IInquiry, InquiryStatus } from "../models/inquiry";
 
 interface CreateInquiryInput {
+  userId: string;
   name: string;
   email: string;
   phone: string;
   message: string;
+  verify: boolean;
 }
 
 interface GetInquiriesOptions {

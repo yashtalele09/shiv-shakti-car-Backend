@@ -54,9 +54,13 @@ const getAllFeaturedVehicle = async (body_type: string) => {
 
 const updateVehicleById = async (id: string, data: {}) => {
   try {
-    const vehicleData = await vehicle.findByIdAndUpdate(id, data, {
-      new: true,
-    });
+    const vehicleData = await vehicle.findOneAndUpdate(
+      { vehicle_id: id },
+      data,
+      {
+        new: true,
+      }
+    );
     return vehicleData;
   } catch (error) {
     throw error;
