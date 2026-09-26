@@ -74,7 +74,7 @@ export const getInquiries = async (
 export const getInquiryByIdAndMarkReceived = async (
   inquiryId: string
 ): Promise<IInquiry | null> => {
-  const inquiry = await Inquiry.findOne({ inquiryId });
+  const inquiry = await Inquiry.findById(inquiryId);
 
   if (!inquiry) return null;
 
@@ -94,22 +94,21 @@ export const updateInquiryStatus = async (
     throw new Error("Invalid status value");
   }
 
-  const inquiry = await Inquiry.findOneAndUpdate(
-    { inquiryId },
+  const inquiry = await Inquiry.findByIdAndUpdate(
+    inquiryId,
     { status },
     { new: true }
   );
 
   return inquiry;
 };
-
 // Used by the user-facing "check my inquiry status" lookup
 export const getInquiryStatusForUser = async (
   inquiryId: string,
   email: string
 ): Promise<{ status: InquiryStatus } | null> => {
   const inquiry = await Inquiry.findOne({
-    inquiryId,
+    _id: inquiryId,
     email: email.toLowerCase().trim(),
   }).select("status");
 
