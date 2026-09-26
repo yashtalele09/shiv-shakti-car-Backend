@@ -5,6 +5,7 @@ import connectDB from "./DB/config";
 import authRoutes from "./routes/auth.routes";
 import vehicleRoutes from "./routes/vehicle.routes";
 import analyticsRoutes from "./routes/analytics.routes";
+import bannerRoutes from "./routes/banner.routes";
 import {
   connectRedis,
   disconnectRedis,
@@ -25,6 +26,7 @@ app.use("/vehicle", vehicleRoutes);
 app.use("/analytics", analyticsRoutes);
 app.use("/reviews", reviewsRoutes);
 app.use("/inquiry", inquiryRoutes);
+app.use("/banner", bannerRoutes);
 
 const start = async () => {
   try {
