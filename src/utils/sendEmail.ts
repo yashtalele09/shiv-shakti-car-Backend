@@ -3,8 +3,6 @@ import { Resend } from "resend";
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 export const sendOtpEmail = async (email: string, otp: string) => {
-  console.log("this is email", email);
-  console.log("this is otp", otp);
   try {
     const response = await resend.emails.send({
       from: process.env.EMAIL_FROM!,
