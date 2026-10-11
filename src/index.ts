@@ -13,6 +13,7 @@ import {
 } from "./config/redis";
 import reviewsRoutes from "./routes/reviews.routes";
 import inquiryRoutes from "./routes/inquiry.routes";
+import likeRoutes from "./routes/like.routes";
 
 const app = express();
 
@@ -27,6 +28,7 @@ app.use("/analytics", analyticsRoutes);
 app.use("/reviews", reviewsRoutes);
 app.use("/inquiry", inquiryRoutes);
 app.use("/banner", bannerRoutes);
+app.use("/like", likeRoutes);
 
 const start = async () => {
   try {
