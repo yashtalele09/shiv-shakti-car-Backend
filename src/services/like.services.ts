@@ -2,24 +2,39 @@ import { validate as isUuid } from "uuid";
 import Like from "../models/like";
 import { getRedisClient, isRedisConnected } from "../config/redis";
 
-export type Actor =
-  | { type: "user"; id: string }
-  | { type: "guest"; id: string };
+// Only logged-in users can like. Guests cannot be represented at all.
+export type Actor = { type: "user"; id: string };
+
+// Lets the controller tell validation errors (400) from server errors (500)
+export class ValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ValidationError";
+  }
+}
+
+// Cache TTLs (seconds). The set must outlive the "loaded" flag, so when the
+// flag expires the set is always rebuilt from Mongo (never the other way round).
+const LOADED_TTL = 60 * 60; // 1 hour: how often we re-sync from Mongo
+const SET_TTL = 2 * 60 * 60; // 2 hours
 
 const likesKey = (vehicleId: string) => `vehicle:likes:${vehicleId}`;
 const loadedKey = (vehicleId: string) => `vehicle:likes:loaded:${vehicleId}`;
-const member = (actor: Actor) =>
-  `${actor.type === "user" ? "u" : "g"}:${actor.id}`;
-const actorFilter = (actor: Actor) =>
-  actor.type === "user" ? { userId: actor.id } : { guestId: actor.id };
+const member = (actor: Actor) => `u:${actor.id}`;
+const actorFilter = (actor: Actor) => ({ userId: actor.id });
 
-// Atomic toggle: returns [liked (0/1), count]
+// Ignores any legacy guest rows (userId: null) that may still be in Mongo
+const USER_ONLY = { userId: { $type: "string" as const } };
+
+// Atomic toggle: returns [liked (0/1), count]. Refreshes the set TTL too.
 const TOGGLE_LUA = `
 if redis.call('SISMEMBER', KEYS[1], ARGV[1]) == 1 then
   redis.call('SREM', KEYS[1], ARGV[1])
+  redis.call('EXPIRE', KEYS[1], ARGV[2])
   return {0, redis.call('SCARD', KEYS[1])}
 else
   redis.call('SADD', KEYS[1], ARGV[1])
+  redis.call('EXPIRE', KEYS[1], ARGV[2])
   return {1, redis.call('SCARD', KEYS[1])}
 end
 `;
@@ -29,25 +44,42 @@ const toBool = (v: unknown) => v === true || Number(v) === 1;
 
 const assertValidId = (vehicleId: string) => {
   if (!isUuid(vehicleId)) {
-    throw new Error("Invalid vehicle id");
+    throw new ValidationError("Invalid vehicle id");
   }
 };
 
-// Rebuild the Redis set from Mongo if it was never loaded (or got evicted)
+// Best-effort: drop cached keys so the next read rebuilds from Mongo.
+// Never throws (Redis may be the thing that's broken).
+const invalidateCache = async (vehicleId: string) => {
+  try {
+    if (!isRedisConnected()) return;
+    const redis = getRedisClient();
+    await redis.del([likesKey(vehicleId), loadedKey(vehicleId)]);
+  } catch (error) {
+    console.error("[likeService.invalidateCache] failed:", error);
+  }
+};
+
+// Rebuild the Redis set from Mongo if it was never loaded (or expired/evicted).
+// The set is REPLACED (not merged), so stale members can never survive.
 const warmCache = async (vehicleId: string) => {
   const redis = getRedisClient();
 
   const loaded = await redis.exists(loadedKey(vehicleId));
   if (loaded) return;
 
-  const likes = await Like.find({ vehicleId }).select("userId guestId").lean();
-  const members = likes.map((l) =>
-    l.userId ? `u:${l.userId}` : `g:${l.guestId}`
-  );
+  const likes = await Like.find({ vehicleId, ...USER_ONLY })
+    .select("userId")
+    .lean();
+  const members = likes.map((l) => `u:${l.userId}`);
 
   const multi = redis.multi();
-  if (members.length) multi.sAdd(likesKey(vehicleId), members);
-  multi.set(loadedKey(vehicleId), "1");
+  multi.del(likesKey(vehicleId));
+  if (members.length) {
+    multi.sAdd(likesKey(vehicleId), members);
+    multi.expire(likesKey(vehicleId), SET_TTL);
+  }
+  multi.set(loadedKey(vehicleId), "1", { EX: LOADED_TTL });
   await multi.exec();
 };
 
@@ -61,7 +93,7 @@ const toggleLike = async (vehicleId: string, actor: Actor) => {
 
       const [liked, count] = (await redis.eval(TOGGLE_LUA, {
         keys: [likesKey(vehicleId)],
-        arguments: [member(actor)],
+        arguments: [member(actor), String(SET_TTL)],
       })) as [number, number];
 
       // Persist to Mongo (source of truth); roll back Redis if it fails
@@ -100,7 +132,10 @@ const toggleLike = async (vehicleId: string, actor: Actor) => {
     await Like.updateOne(filter, { $setOnInsert: filter }, { upsert: true });
   }
 
-  const likesCount = await Like.countDocuments({ vehicleId });
+  // Mongo changed without Redis knowing -> force a rebuild on next read
+  await invalidateCache(vehicleId);
+
+  const likesCount = await Like.countDocuments({ vehicleId, ...USER_ONLY });
   return { liked: !existing, likesCount };
 };
 
@@ -130,7 +165,7 @@ const getLikeStatus = async (vehicleId: string, actor?: Actor | null) => {
   }
 
   const [likesCount, mine] = await Promise.all([
-    Like.countDocuments({ vehicleId }),
+    Like.countDocuments({ vehicleId, ...USER_ONLY }),
     actor
       ? Like.exists({ ...actorFilter(actor), vehicleId })
       : Promise.resolve(null),
@@ -174,7 +209,7 @@ const getBulkLikes = async (vehicleIds: string[], actor?: Actor | null) => {
   }
 
   const counts = await Like.aggregate([
-    { $match: { vehicleId: { $in: ids } } },
+    { $match: { vehicleId: { $in: ids }, ...USER_ONLY } },
     { $group: { _id: "$vehicleId", count: { $sum: 1 } } },
   ]);
   const mine = actor
@@ -208,6 +243,7 @@ const likeService = {
   getLikeStatus,
   getBulkLikes,
   getMyLikedVehicleIds,
+  invalidateCache, // handy if you ever edit/delete likes from an admin tool
 };
 
 export default likeService;

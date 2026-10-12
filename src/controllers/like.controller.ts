@@ -1,27 +1,29 @@
 import { Request, Response } from "express";
-import { validate as isUuid } from "uuid";
-import likeService, { Actor } from "../services/like.services";
+import likeService, { Actor, ValidationError } from "../services/like.services";
 
-// Logged-in user -> req.user (set by auth middleware)
-// Guest          -> `x-guest-id` header (uuid generated on the frontend)
+// Only logged-in users (req.user is set by the auth middleware)
 const getActor = (req: Request): Actor | null => {
   const user = (req as any).user;
   const userId = user?.id ?? user?._id;
-  if (userId) return { type: "user", id: String(userId) };
+  return userId ? { type: "user", id: String(userId) } : null;
+};
 
-  const guestId = req.header("x-guest-id");
-  if (guestId && isUuid(guestId)) return { type: "guest", id: guestId };
-
-  return null;
+// 400 for validation problems, 500 for everything else
+const handleError = (res: Response, error: unknown, fallback: string) => {
+  if (error instanceof ValidationError) {
+    return res.status(400).json({ success: false, message: error.message });
+  }
+  console.error(`[LikeController] ${fallback}:`, error);
+  return res.status(500).json({ success: false, message: fallback });
 };
 
 const toggleLikeController = async (req: Request, res: Response) => {
   try {
     const actor = getActor(req);
     if (!actor) {
-      return res.status(400).json({
+      return res.status(401).json({
         success: false,
-        message: "Login or a valid x-guest-id header is required",
+        message: "Please log in to like a vehicle",
       });
     }
 
@@ -31,15 +33,15 @@ const toggleLikeController = async (req: Request, res: Response) => {
         .status(400)
         .json({ success: false, message: "vehicleId query param is required" });
     }
+
     const data = await likeService.toggleLike(vehicleId as string, actor);
     return res.status(200).json({ success: true, data });
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Failed to toggle like";
-    return res.status(400).json({ success: false, message });
+    return handleError(res, error, "Failed to toggle like");
   }
 };
 
+// Public: logged-out users still see the count, `liked` is just false
 const getLikeStatusController = async (req: Request, res: Response) => {
   try {
     const { vehicleId } = req.query;
@@ -48,18 +50,18 @@ const getLikeStatusController = async (req: Request, res: Response) => {
         .status(400)
         .json({ success: false, message: "vehicleId query param is required" });
     }
+
     const data = await likeService.getLikeStatus(
       vehicleId as string,
       getActor(req)
     );
     return res.status(200).json({ success: true, data });
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Failed to fetch like status";
-    return res.status(400).json({ success: false, message });
+    return handleError(res, error, "Failed to fetch like status");
   }
 };
 
+// Public: same as above
 const getBulkLikesController = async (req: Request, res: Response) => {
   try {
     const ids = String(req.query.ids ?? "")
@@ -76,9 +78,7 @@ const getBulkLikesController = async (req: Request, res: Response) => {
     const data = await likeService.getBulkLikes(ids, getActor(req));
     return res.status(200).json({ success: true, data });
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Failed to fetch likes";
-    return res.status(400).json({ success: false, message });
+    return handleError(res, error, "Failed to fetch likes");
   }
 };
 
@@ -86,18 +86,16 @@ const getMyLikesController = async (req: Request, res: Response) => {
   try {
     const actor = getActor(req);
     if (!actor) {
-      return res.status(400).json({
+      return res.status(401).json({
         success: false,
-        message: "Login or a valid x-guest-id header is required",
+        message: "Please log in to view your likes",
       });
     }
 
     const vehicleIds = await likeService.getMyLikedVehicleIds(actor);
     return res.status(200).json({ success: true, data: { vehicleIds } });
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Failed to fetch your likes";
-    return res.status(400).json({ success: false, message });
+    return handleError(res, error, "Failed to fetch your likes");
   }
 };
 
