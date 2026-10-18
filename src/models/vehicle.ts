@@ -14,65 +14,87 @@ const vehicleSchema = new mongoose.Schema(
     },
     vehicle_brand: {
       type: String,
-      require: true,
+      required: true,
     },
     vehicle_varient: {
       type: String,
-      require: true,
+      required: true,
     },
     vehicle_color: {
       type: String,
-      require: true,
+      required: true,
     },
     vehicle_location: {
       type: String,
-      require: true,
+      required: true,
     },
     vehicle_price: {
       type: Number,
-      require: true,
+      required: true,
     },
     kilometers_driven: {
       type: Number,
-      require: true,
+      required: true,
     },
     owner_count: {
       type: Number,
-      require: true,
+      required: true,
     },
     fuel_type: {
       type: String,
-      require: true,
+      required: true,
     },
     transmission_type: {
       type: String,
-      require: true,
+      required: true,
     },
     body_type: {
       type: String,
-      require: true,
+      required: true,
     },
     registration_year: {
       type: Number,
-      require: true,
+      required: true,
     },
     insurance_validity: {
       type: Date,
-      require: true,
+      required: true,
     },
     vehicle_description: {
       type: String,
-      require: true,
+      required: true,
     },
     vehicle_images_video: {
       type: Array,
-      require: true,
+      required: true,
     },
     vehicle_type: {
       type: String,
-      require: true,
+      required: true,
     },
     isFeatured: {
+      type: Boolean,
+      default: false,
+    },
+
+    owner_name: {
+      type: String,
+      trim: true,
+    },
+
+    isSold: {
+      type: Boolean,
+      default: false,
+    },
+    sold_price: {
+      type: Number,
+      default: null,
+    },
+    sold_date: {
+      type: Date,
+      default: null,
+    },
+    isReturn: {
       type: Boolean,
       default: false,
     },
