@@ -307,9 +307,22 @@ const getVehicleById = async (req: Request, res: Response) => {
   }
 };
 
+const toBoolean = (val: unknown): boolean | undefined => {
+  if (val === undefined || val === null || val === "") return undefined;
+  if (typeof val === "boolean") return val;
+  return String(val).toLowerCase() === "true";
+};
+
 const updateVehicleById = async (req: Request, res: Response) => {
   try {
     const { vehicle_id } = req.query;
+
+    if (!vehicle_id) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Vehicle ID is required" });
+    }
+
     const {
       vehicle_model,
       vehicle_brand,
@@ -327,39 +340,96 @@ const updateVehicleById = async (req: Request, res: Response) => {
       vehicle_description,
       vehicle_images_video,
       vehicle_type,
+      isFeatured,
+      // new sold / return fields
+      owner_name,
+      isSold,
+      sold_price,
+      sold_date,
+      isReturn,
     } = req.body;
-    if (!vehicle_id) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Vehicle ID is required" });
+
+    const soldFlag = toBoolean(isSold);
+    const returnFlag = toBoolean(isReturn);
+
+    // When marking as sold, the sale details must be provided
+    if (soldFlag === true) {
+      if (
+        sold_price === undefined ||
+        sold_price === null ||
+        sold_price === ""
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: "sold_price is required when marking a vehicle as sold",
+        });
+      }
     }
+
+    const updateData: Record<string, unknown> = {
+      vehicle_model,
+      vehicle_brand,
+      vehicle_varient,
+      vehicle_color,
+      vehicle_location,
+      vehicle_price,
+      kilometers_driven,
+      owner_count,
+      fuel_type,
+      transmission_type,
+      body_type,
+      registration_year,
+      insurance_validity,
+      vehicle_description,
+      vehicle_images_video,
+      vehicle_type,
+      isFeatured: toBoolean(isFeatured),
+      owner_name,
+      isSold: soldFlag,
+      sold_price:
+        sold_price !== undefined && sold_price !== ""
+          ? Number(sold_price)
+          : undefined,
+      sold_date: sold_date ? new Date(sold_date) : undefined,
+      isReturn: returnFlag,
+    };
+
+    // Default the sold date to now when marking as sold without a date
+    if (soldFlag === true && !updateData.sold_date) {
+      updateData.sold_date = new Date();
+    }
+
+    // If the vehicle is being put back on sale, clear the sale details
+    if (soldFlag === false) {
+      updateData.sold_price = null;
+      updateData.sold_date = null;
+    }
+
+    // Only send fields that were actually provided (partial update)
+    Object.keys(updateData).forEach(
+      (key) => updateData[key] === undefined && delete updateData[key]
+    );
+
     const vehicleData = await vehicleService.updateVehicleById(
       vehicle_id as string,
-      {
-        vehicle_model,
-        vehicle_brand,
-        vehicle_varient,
-        vehicle_color,
-        vehicle_location,
-        vehicle_price,
-        kilometers_driven,
-        owner_count,
-        fuel_type,
-        transmission_type,
-        body_type,
-        registration_year,
-        insurance_validity,
-        vehicle_description,
-        vehicle_images_video,
-        vehicle_type,
-      }
+      updateData
     );
+
+    if (!vehicleData) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Vehicle not found" });
+    }
+
+    await invalidateVehicleListCache();
+
     res.status(200).json({
       success: true,
       message: "Vehicle updated successfully",
       vehicleData,
     });
   } catch (error) {
+    console.error(error);
     res.status(500).json({ success: false, message: "Internal server error" });
   }
 };
