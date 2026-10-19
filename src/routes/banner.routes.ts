@@ -7,11 +7,13 @@ const router = Router();
 
 router.post(
   "/create-banner",
+  authenticateAdmin,
   upload.single("image"),
   BannerController.createBannerController
 );
 router.post(
   "/update-banner/:index",
+  authenticateAdmin,
   upload.single("image"),
   BannerController.upsertSlideController
 );
