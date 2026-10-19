@@ -10,12 +10,8 @@ router.post("/send-otp", inquiryController.sendInquiryOtp);
 router.post("/verify-otp", inquiryController.verifyInquiryOtpController);
 router.get("/check-status", inquiryController.checkInquiryStatus);
 // Admin
-router.get("/get-inquiry", authenticateAdmin, inquiryController.getInquiries);
-router.get(
-  "/get-inquiry-by-id",
-  authenticateAdmin,
-  inquiryController.getInquiryById
-);
+router.get("/get-inquiry", inquiryController.getInquiries);
+router.get("/get-inquiry-by-id", inquiryController.getInquiryById);
 router.patch(
   "/update-status",
   authenticateAdmin,
