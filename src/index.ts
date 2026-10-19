@@ -22,6 +22,8 @@ app.use(express.json());
 
 const PORT = process.env.PORT || 3000;
 
+app.get("/", (req, res) => res.status(200).send("Shiv shakti car bazar"));
+
 app.use("/auth", authRoutes);
 app.use("/vehicle", vehicleRoutes);
 app.use("/analytics", analyticsRoutes);
@@ -29,6 +31,8 @@ app.use("/reviews", reviewsRoutes);
 app.use("/inquiry", inquiryRoutes);
 app.use("/banner", bannerRoutes);
 app.use("/like", likeRoutes);
+
+app.get("/health", (req, res) => res.status(200).send("ok"));
 
 const start = async () => {
   try {
