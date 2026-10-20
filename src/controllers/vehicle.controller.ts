@@ -436,21 +436,32 @@ const updateVehicleById = async (req: Request, res: Response) => {
 
 const deleteVehicleById = async (req: Request, res: Response) => {
   try {
-    const { vehicle_id } = req.params;
+    const { vehicle_id } = req.query; // was req.params (route has no :vehicle_id)
     if (!vehicle_id) {
       return res
         .status(400)
         .json({ success: false, message: "Vehicle ID is required" });
     }
+
     const vehicleData = await vehicleService.deleteVehicleById(
       vehicle_id as string
     );
+
+    if (!vehicleData) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Vehicle not found" });
+    }
+
+    await invalidateVehicleListCache();
+
     res.status(200).json({
       success: true,
       message: "Vehicle deleted successfully",
       vehicleData,
     });
   } catch (error) {
+    console.error(error);
     res.status(500).json({ success: false, message: "Internal server error" });
   }
 };

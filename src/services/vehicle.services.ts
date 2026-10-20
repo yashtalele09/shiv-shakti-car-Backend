@@ -67,9 +67,9 @@ const updateVehicleById = async (id: string, data: {}) => {
   }
 };
 
-const deleteVehicleById = async (id: string) => {
+const deleteVehicleById = async (vehicle_id: string) => {
   try {
-    const vehicleData = await vehicle.findByIdAndDelete(id);
+    const vehicleData = await vehicle.deleteOne({ vehicle_id });
     return vehicleData;
   } catch (error) {
     throw error;

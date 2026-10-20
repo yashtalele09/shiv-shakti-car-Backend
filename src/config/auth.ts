@@ -7,12 +7,14 @@ if (!process.env.JWT_SECRET_KEY) {
 }
 
 if (!process.env.JWT_ADMIN_SECRET_KEY) {
-  throw new Error("JWT_ADMIN_SECRET_KEY is not defined in environment variables");
+  throw new Error(
+    "JWT_ADMIN_SECRET_KEY is not defined in environment variables"
+  );
 }
 
 export const authConfig = {
   jwtSecret: process.env.JWT_SECRET_KEY,
-  jwtExpiresIn: "24h",
+  jwtExpiresIn: "1m",
   bcryptSaltRounds: 10,
 } as const;
 
