@@ -8,6 +8,13 @@ import { invalidateVehicleListCache } from "../utils/cascheUtils";
 const VEHICLE_CACHE_PREFIX = "vehicles:list:";
 const VEHICLE_CACHE_TTL = 300;
 
+const ALLOWED_SORT_FIELDS = [
+  "vehicle_price",
+  "registration_year",
+  "kilometers_driven",
+  "vehicle_model",
+];
+
 const createVehicleController = async (req: Request, res: Response) => {
   try {
     const {
@@ -106,7 +113,9 @@ const getAllVehicle = async (req: Request, res: Response) => {
       page,
       limit,
       search,
-      sort,
+      sort, // legacy: "asc" | "desc" on vehicle_model
+      sort_by,
+      sort_order,
       // String filters
       body_type,
       vehicle_model,
@@ -127,25 +136,28 @@ const getAllVehicle = async (req: Request, res: Response) => {
     } = req.query;
 
     // ── CACHE KEY ─────────────────────────────────────────────────────
+    // NOTE: changed prefix to v2 because the cached shape changed.
+    // Make sure VEHICLE_CACHE_PREFIX ends with something like "vehicles:v2:"
     const cacheKey = `${VEHICLE_CACHE_PREFIX}${JSON.stringify(req.query)}`;
 
-    // ── TRY CACHE FIRST (graceful degradation if Redis is down) ───────
+    // ── TRY CACHE FIRST ───────────────────────────────────────────────
     if (isRedisConnected()) {
       try {
         const client = getRedisClient();
         const cached = await client.get(cacheKey);
         if (cached) {
+          const parsed = JSON.parse(cached);
           res.status(200).json({
             success: true,
             message: "Vehicle fetched successfully",
-            vehicleData: JSON.parse(cached),
+            vehicleData: parsed.vehicleData,
+            total: parsed.total,
             cached: true,
           });
           return;
         }
       } catch (cacheErr) {
         console.error("[Redis] GET failed, falling back to DB:", cacheErr);
-        // fall through to DB query
       }
     }
 
@@ -175,19 +187,20 @@ const getAllVehicle = async (req: Request, res: Response) => {
       }
     };
 
-    // ── SEARCH (across all text fields) ──────────────────────────────
+    // ── SEARCH ────────────────────────────────────────────────────────
     if (search) {
+      const s = search as string;
       const searchConditions = {
         $or: [
-          { vehicle_model: { $regex: search as string, $options: "i" } },
-          { vehicle_brand: { $regex: search as string, $options: "i" } },
-          { vehicle_varient: { $regex: search as string, $options: "i" } },
-          { vehicle_color: { $regex: search as string, $options: "i" } },
-          { vehicle_location: { $regex: search as string, $options: "i" } },
-          { fuel_type: { $regex: search as string, $options: "i" } },
-          { transmission_type: { $regex: search as string, $options: "i" } },
-          { body_type: { $regex: search as string, $options: "i" } },
-          { vehicle_type: { $regex: search as string, $options: "i" } },
+          { vehicle_model: { $regex: s, $options: "i" } },
+          { vehicle_brand: { $regex: s, $options: "i" } },
+          { vehicle_varient: { $regex: s, $options: "i" } },
+          { vehicle_color: { $regex: s, $options: "i" } },
+          { vehicle_location: { $regex: s, $options: "i" } },
+          { fuel_type: { $regex: s, $options: "i" } },
+          { transmission_type: { $regex: s, $options: "i" } },
+          { body_type: { $regex: s, $options: "i" } },
+          { vehicle_type: { $regex: s, $options: "i" } },
         ],
       };
       if (!query.$and) query.$and = [];
@@ -224,10 +237,17 @@ const getAllVehicle = async (req: Request, res: Response) => {
     }
 
     // ── SORT ──────────────────────────────────────────────────────────
+    // Featured cars first (remove this line for a pure price/year/km sort)
     const sortOptions: any = { isFeatured: -1 };
-    if (sort) {
+
+    if (sort_by && ALLOWED_SORT_FIELDS.includes(sort_by as string)) {
+      sortOptions[sort_by as string] = sort_order === "asc" ? 1 : -1;
+    } else if (sort) {
       sortOptions.vehicle_model = (sort as string) === "asc" ? 1 : -1;
     }
+
+    // UNIQUE TIEBREAKER: keeps pagination stable. Must be last.
+    sortOptions._id = 1;
 
     // ── PAGINATION ────────────────────────────────────────────────────
     const isAll = (limit as string)?.toLowerCase() === "all";
@@ -235,21 +255,21 @@ const getAllVehicle = async (req: Request, res: Response) => {
     const limitNumber = isAll ? 0 : parseInt(limit as string) || 10;
     const skip = isAll ? 0 : (pageNumber - 1) * limitNumber;
 
-    const vehicleData = await vehicleService.getAllVehicle(
+    const { vehicleData, total } = await vehicleService.getAllVehicle(
       query,
       sortOptions,
       skip,
       limitNumber
     );
 
-    // ── WRITE TO CACHE (graceful degradation) ──────────────────────────
+    // ── WRITE TO CACHE ────────────────────────────────────────────────
     if (isRedisConnected()) {
       try {
         const client = getRedisClient();
         await client.setEx(
           cacheKey,
           VEHICLE_CACHE_TTL,
-          JSON.stringify(vehicleData)
+          JSON.stringify({ vehicleData, total })
         );
       } catch (cacheErr) {
         console.error(
@@ -263,9 +283,11 @@ const getAllVehicle = async (req: Request, res: Response) => {
       success: true,
       message: "Vehicle fetched successfully",
       vehicleData,
+      total,
       cached: false,
     });
   } catch (error) {
+    console.error("getAllVehicle error:", error);
     res.status(500).json({ success: false, message: "Internal server error" });
   }
 };

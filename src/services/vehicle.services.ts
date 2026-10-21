@@ -25,12 +25,11 @@ const getAllVehicle = async (
   limit: number
 ) => {
   try {
-    const vehicleData = await vehicle
-      .find(query)
-      .sort(sortOptions)
-      .skip(skip)
-      .limit(limit);
-    return vehicleData;
+    const [vehicleData, total] = await Promise.all([
+      vehicle.find(query).sort(sortOptions).skip(skip).limit(limit),
+      vehicle.countDocuments(query),
+    ]);
+    return { vehicleData, total };
   } catch (error) {
     throw error;
   }
