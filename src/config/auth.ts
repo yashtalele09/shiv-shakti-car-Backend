@@ -14,12 +14,12 @@ if (!process.env.JWT_ADMIN_SECRET_KEY) {
 
 export const authConfig = {
   jwtSecret: process.env.JWT_SECRET_KEY,
-  jwtExpiresIn: "1m",
+  jwtExpiresIn: "7d",
   bcryptSaltRounds: 10,
 } as const;
 
 export const adminAuthConfig = {
   jwtSecret: process.env.JWT_ADMIN_SECRET_KEY,
-  jwtExpiresIn: "24h",
+  jwtExpiresIn: "7d",
   bcryptSaltRounds: 10,
 } as const;
